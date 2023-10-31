@@ -29,6 +29,12 @@
   - Register file always outputs the contents of the register corresponding to read register numbers specified. Reading a register is not dependent on any other signals.
   - Register Write: Register writes are controlled by a control signal (Control Unit) RegWrite. The write should happen if RegWrite signal is 1 and on the posedge the clock.
 
+## Data/Control hazards
+- Data hazards: an instruction is unable to execute in the planned cycle because it is dependent on some data that has not yet been committed.
+- Control hazards: we do not know which instruction needs to be executed next.
+- Forwarding (or bypassing): the needed data is forwarded as soon as possible to the instruction which depends on it.
+- Stalling: the dependent instruction is “pushed back” for one or more clock cycles. Alternatively, you can think of stalling as the execution of a noop for one or more cycles.
+
 ## Forwarding Unit
 - The reference does not include this. The main purpose of a forwarding unit is to aid speeding up the data hazards that can occur in a pipelined processor. Data hazards are detected when the source register contains the same instruction as the destination register of the previous instruction. 
   - A forwarding unit can be used to circumvent the cycle loss caused by a stall. A forward allows other instructions to read ALU results directly from the pipeline registers rather than having to read directly from the register file. 
@@ -39,14 +45,17 @@
 - This plays into a forwarding unit, a stall happens when the CLU determines if the decoded instruction reads from a register to which the currently instruction writes. If this holds a stall, or a *bubble* occurs. 
   - As an example: In a risc pipeline, if we have data after the MEM stage of the pipeline that is required by a second instruction in the EX stage that is delayed by a clock cycle. Since we can only read forwards and not backwards in clock cycle, we need to insert a stall in the second instruction. By doing this, we can pass the data in the first instruction in MEM forwards to the EX stage of the second instruction's pipeline. 
 ![RISC-stall](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/RISC_stall.png)
+![Helpful powerpoint](https://www.cs.fsu.edu/~zwang/files/cda3101/Fall2017/Lecture9_cda3101.pdf)
 
 ## Control Unit
 - A control unit is what is sounds like: it controls aspects of the Pipeline's datapath. (ie RegWrite)
-  - ![Control Unit](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/Control_signal.png)
-  - ![Control Unit desc](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/Control_signal_desc.png)
+![Control Unit](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/Control_signal.png)
+![Control Unit desc](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/Control_signal_desc.png)
 
 ## ALU 
-- 
+- The ALU controls all core arithmetic and logical processes for the instruction. It can add registers together, and performs all AND, OR, NOT, etc. operations. It also handles carries in addition by using logical shifts. 
+  -  Carry: set to 1 if there is a carry in the most-significant bit which we could not output in the given number of bits (32 bits, above).
+  - Overflow: set to 1 of the input operands have the same sign, and the result has a different sign. For example, if the sum of two positive numbers yields a negative result, then an overflow occurs. 
 
 ## Datapath
 - Instruction fields and data generally move from left-to-right as they progress through
@@ -56,6 +65,7 @@ The two exceptions are:
 datapath leads to data hazards.
   - The selection of the next value of the PC – either the incremented PC or the branch address leads to control hazards.
   - [Helpful powerpoint](https://www.cs.fsu.edu/~zwang/files/cda3101/Fall2017/Lecture8_cda3101.pdf)
+  
 
 - Load Word example:
   - Instruction Fetch (IF)
@@ -71,6 +81,8 @@ datapath leads to data hazards.
     - Take the address stored in the EX/MEM pipeline register and use it to access data memory. The data read from memory is stored in the MEM/WB pipeline register.
   - Write Back (WB)
     - Read the data from the MEM/WB register and write it back to the register file in the middle of the datapath
+
+
 
 
 ## Top level (Processor)
