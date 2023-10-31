@@ -1,6 +1,6 @@
 # 5 stage pipelined version of Single Cycle RISC-V processor
 
-![Pipeline](https://github.com/AdilHydari/Pipelined_RiscV//blob/main/image_source/Pipeline_structure.png)
+![Pipeline](https://github.com/AdilHydari/Pipelined_RiscV/blob/main/image_source/Pipeline_structure.png)
 
   - 32 bit
   - IF: Instruction Fetch
