@@ -82,11 +82,23 @@ datapath leads to data hazards.
   - Write Back (WB)
     - Read the data from the MEM/WB register and write it back to the register file in the middle of the datapath
 
+## Branch Prediction
+![BATAGE Dynamic Branch Prediction](https://link.springer.com/article/10.1007/s13369-022-07593-9)
+![Comparison of Branch Prediction techniques](https://arxiv.org/pdf/2312.10426.pdf)
+- Static branch prediction seems to be the first step in terms of hardware cost and the marginally improved performance of the processor in terms of stalls encounutered.
+  - There are 3 generalised ways in which static branch prediction is thought of:
+   - Unconditional Jumps: These are instructions such as JMP or B (on arm)
+   - Unknown values: When a value is unknown on a jump instruction, there is very little that can be done in terms of prediction (at least statically), instead, the JMP instruction must stall until the point where the value of the register has been calculated.
+   - Branch instructions: Instructions such as BEQ or BNQ can jump between Direct and Indirect branches. On a branch instruction, they some branches perform operations on register values which already exist, meaning that it reaches back into another instruction to grab this register value. Based on this, the processor (or runtime) can assume that the branches that point backwards into another instruction are likely to be taken as the register values in the branch have already been evaluated.
+- Return address stack
+
+
+## AMBA AXI-4 LITE: interprocessor connect
 
 
 
 ## Top level (Processor)
-- 
+- All of these units fall under the CPU, when implementing in verilog, I will have to create a seperate CPU.v file in order to import all existing modules in other files such as the forwarding unit or the control unit.
 
 
 
