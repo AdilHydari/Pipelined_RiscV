@@ -90,7 +90,9 @@ datapath leads to data hazards.
    - Unconditional Jumps: These are instructions such as JMP or B (on arm)
    - Unknown values: When a value is unknown on a jump instruction, there is very little that can be done in terms of prediction (at least statically), instead, the JMP instruction must stall until the point where the value of the register has been calculated.
    - Branch instructions: Instructions such as BEQ or BNQ can jump between Direct and Indirect branches. On a branch instruction, they some branches perform operations on register values which already exist, meaning that it reaches back into another instruction to grab this register value. Based on this, the processor (or runtime) can assume that the branches that point backwards into another instruction are likely to be taken as the register values in the branch have already been evaluated.
-- Return address stack
+- Return address stack: Rather than a branch predictor, RAS is a separate predictor used specifically for predicting returns. A return is an indirect jump as the caller function is unknown; however, the return address is known by the ISA (dependent on the return call) as to whether this is a call or a return. On a call, the address of the instruction following the call is pushed onto the RAS. Pre-decoding an instruction is a way for the RAS to pre-fetch instructions and decode them (IF/DE) and determine if it is a "ret" instruction and will accordingly store information into the cache pertaining to the return.
+- Branch Target Buffer: The simplest predictor that uses history is the BTB.
+
 
 
 ## AMBA AXI-4 LITE: interprocessor connect
