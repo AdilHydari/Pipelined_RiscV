@@ -14,7 +14,7 @@
     - EX/MEM
     - MEM/WB
 
-## Instruc mem and Data mem
+## Instruction mem and Data mem
 - OP-codes are fetched during the IF stage from the instruction memory
 - Data memory is used for the Data-path block in order to hold data between different pipeline stages (ie holding the value of the EX/MEM register)
 
@@ -81,6 +81,13 @@ datapath leads to data hazards.
     - Take the address stored in the EX/MEM pipeline register and use it to access data memory. The data read from memory is stored in the MEM/WB pipeline register.
   - Write Back (WB)
     - Read the data from the MEM/WB register and write it back to the register file in the middle of the datapath
+
+## RISC-V RV32I instruction description
+- 
+
+
+
+
 
 ## Branch Prediction
 ![BATAGE Dynamic Branch Prediction](https://link.springer.com/article/10.1007/s13369-022-07593-9)
