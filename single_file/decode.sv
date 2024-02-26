@@ -1,127 +1,223 @@
 /*
-************************************************************
-Address decoding for I, S, U, Uraw (AUIPC, LUI), B and J type IMM instructions
-ALUreg:
-  ALUREG consists of an arithmetic and logical unit (ALU) and a register file.
-  https://usercontent.irccloud-cdn.com/file/oI4aJRi8/ALUREG.png
-  ALUreg does not support divide inst. instead, it allows for single cycle I and Mult. inst.
-ALUimm:
-  The selector signal for input b of the ALU; uses IMM for immediate addr decoding.
+ * A simple disassembler for RiscV written in VERILOG.
+ * See table page 104 of RiscV instruction manual.
+ * Bruno Levy, August 2022
+ * usage:
+ * module XXX( ... );
+ *   ...
+ *   ...
+ *   `include "riscv_disassembly.v" // yes, *inside* module definition.
+ *   always @(posedge clk) begin
+ *      riscv_disasm(instr, PC);
+ *      $write("\n");
+ *   end
+ * endmodule
+ */
 
-BRANCH: 
-  Reference: RVG opcodes(images)
-  B Type instruction; comparison of 2 registers
 
-JALR:
-  Indirect jump; JUMP and LINK REGISTER; I-type encoding
-  JALR used to enable a two-instruction sequence to jump anywhere in a 32-bit absolute address range
+/* Functions to decode immediates */
 
-JAL: 
-  J-type encoding; Plain old unconditional Jumps 
+function signed [31:0] riscv_disasm_Iimm;
+  input [31:0] instr;
+  riscv_disasm_Iimm = {{21{instr[31]}}, instr[30:20]};
+endfunction
 
-AUIPC:
-  U-type encoding; forms a 32-bit offset from the 20-bit U-immediate, filling in the lowest 12 bits with zeros, adds this offset to the address of the AUIPC instruction, then places the result in register rd
+function signed [31:0] riscv_disasm_Simm;
+  input [31:0] instr;
+  riscv_disasm_Simm = {{21{instr[31]}}, instr[30:25],instr[11:7]};
+endfunction
 
-LUI:
-  U-type encoding; places the U-immediate value in the top 20 bits of the destination register rd, filling in the lowest 12 bits with zeros.
+function [19:0] riscv_disasm_Uimm_raw;
+  input [31:0] instr;
+  riscv_disasm_Uimm_raw = {instr[31:12]};
+endfunction
 
-LOAD:
-  What it sounds like.
+function [31:0] riscv_disasm_Uimm;
+  input [31:0] instr;
+  riscv_disasm_Uimm = {instr[31],instr[30:12],{12{1'b0}}};
+endfunction
 
-STORE:
-  What it sounds like.
+function [31:0] riscv_disasm_Bimm;
+  input [31:0] instr;
+  riscv_disasm_Bimm = {
+	  {20{instr[31]}},instr[7],instr[30:25],instr[11:8],1'b0
+  };
+endfunction
 
-SYSTEM:
-  I-type encoding; SYSTEM instructions are used to access system functionality that might require privileged access; i.e. (some) CSRs and potential privileged instructions.
+function [31:0] riscv_disasm_Jimm;
+  input [31:0] instr;
+  riscv_disasm_Jimm = {
+          {12{instr[31]}},instr[19:12],instr[20],instr[30:21],1'b0
+  };
+endfunction
 
-***************************************************************************************************
-   5'b01100 | ALUreg  | rd <- rs1 OP rs2   
-   5'b00100 | ALUimm  | rd <- rs1 OP Iimm
-   5'b11000 | Branch  | if(rs1 OP rs2) PC<-PC+Bimm
-   5'b11001 | JALR    | rd <- PC+4; PC<-rs1+Iimm
-   5'b11011 | JAL     | rd <- PC+4; PC<-PC+Jimm
-   5'b00101 | AUIPC   | rd <- PC + Uimm
-   5'b01101 | LUI     | rd <- Uimm   
-   5'b00000 | Load    | rd <- mem[rs1+Iimm]
-   5'b01000 | Store   | mem[rs1+Simm] <- rs2
-   5'b11100 | SYSTEM  | opcode
-***************************************************************************************************
-Created according to chapter 25 of the RISC-V spec documentation.
-*/
-// function: https://www.chipverify.com/systemverilog/systemverilog-functions
-// didn't know these existed
+
 /* 
- Instr. 	    Description 	                            Immediate value encoding
-R-type 	  register-register ALU ops. 	                            None
-I-type 	  register-immediate integer ALU ops and JALR. 	 12 bits, sign expansion
-S-type 	  store 	                                       12 bits, sign expansion
-B-type 	  branch 	                                       12 bits, sign expansion, upper [31:1]
-U-type 	  LUI,AUIPC 	                                   20 bits, upper 31:12 (bits [11:0] are 0)
-J-type 	  JAL 	                                         12 bits, sign expansion, upper [31:1]
-*/
+ * disassembler (see comment at the beginning of this file)
+ */ 
+task riscv_disasm;
+   input [31:0] instr;
+   input [31:0] PC;   
+   begin
+      case(instr[6:0])
+	7'b0110011: begin
+	   if(instr[31:7] == 0) begin
+	     $write("nop");
+	   end else begin
+	      if(instr[25]) begin  // RV32M instructions
+		 case(instr[14:12])
+		   3'b000: $write("mul");
+		   3'b001: $write("mulh");
+		   3'b010: $write("mulhsu");
+		   3'b011: $write("mulhu");
+		   3'b100: $write("div");
+		   3'b101: $write("divu");
+		   3'b110: $write("rem");
+		   3'b111: $write("remu");
+		 endcase 
+	      end else begin
+		 case(instr[14:12])
+		   3'b000: $write("%s", instr[30] ? "sub" : "add");
+		   3'b001: $write("sll");
+		   3'b010: $write("slt");
+		   3'b011: $write("sltu");
+		   3'b100: $write("xor");
+		   3'b101: $write("%s", instr[30] ? "sra" : "srl");
+		   3'b110: $write("or");
+		   3'b111: $write("and");
+		 endcase // case (instr[14:12])
+	      end
+	      $write(" x%0d,x%0d,x%0d",instr[11:7],instr[19:15],instr[24:20]);
+	   end
+	end
+	7'b0010011: begin
+	   case(instr[14:12])
+	     3'b000: $write("addi");
+	     3'b010: $write("slti");
+	     3'b011: $write("sltiu");
+	     3'b100: $write("xori");
+	     3'b110: $write("ori");
+	     3'b111: $write("andi");
+	     3'b001: $write("slli");
+	     3'b101: $write("%s", instr[30] ? "srai" : "srli");
+	   endcase
+	   if(instr[14:12] == 3'b001 || instr[14:12] == 3'b101) begin
+	      $write(" x%0d,x%0d,%0d",
+		     instr[11:7],instr[19:15],instr[24:20]
+		     );
+	   end else begin
+	      $write(" x%0d,x%0d,%0d",
+		     instr[11:7],instr[19:15],riscv_disasm_Iimm(instr)
+		     );
+	   end
+	end
+	7'b1100011: begin
+	   case(instr[14:12])
+	     3'b000: $write("beq");
+	     3'b001: $write("bne");
+	     3'b100: $write("blt");
+	     3'b101: $write("bge");
+	     3'b110: $write("bltu");
+	     3'b111: $write("bgeu");
+	     default: $write("B???");
+	   endcase 
+  	   $write(" x%0d,x%0d,0x%0h",
+		  instr[19:15],instr[24:20],PC+riscv_disasm_Bimm(instr)
+	   );
+	end
+	7'b1100111:
+	  $write("jalr x%0d,x%0d,%0d",
+		 instr[11:7],instr[19:15],riscv_disasm_Iimm(instr)
+	  );
+	7'b1101111:
+	  $write("jal x%0d,0x%0h",instr[11:7],PC+riscv_disasm_Jimm(instr));
+	7'b0010111:
+	  $write("auipc x%0d,0x%0h <0x%0h>",
+		 instr[11:7],
+		 riscv_disasm_Uimm_raw(instr),PC+riscv_disasm_Uimm(instr)
+	  );	  	  	  	  
+	7'b0110111:
+	  $write("lui x%0d,0x%0h <0x%0h>",
+		 instr[11:7],
+		 riscv_disasm_Uimm_raw(instr),riscv_disasm_Uimm(instr)
+          );	  
+	7'b0000011: begin
+	   case(instr[14:12])
+	     3'b000: $write("lb");
+	     3'b001: $write("lh");
+	     3'b010: $write("lw");
+	     3'b100: $write("lbu");
+	     3'b101: $write("lhu");
+	     default: $write("l??");
+	   endcase 
+	   $write(" x%0d,%0d(x%0d)",
+		  instr[11:7],riscv_disasm_Iimm(instr),instr[19:15]
+           );
+	end
+	7'b0100011: begin
+	   case(instr[14:12])
+	     3'b000: $write("sb");
+	     3'b001: $write("sh");
+	     3'b010: $write("sw");
+	     default: $write("s??");
+	   endcase 
+	   $write(" x%0d,%0d(x%0d)",
+		  instr[24:20],riscv_disasm_Simm(instr),instr[19:15]
+	   );
+	end
+	7'b1110011: begin
+	   case(instr[14:12])
+	     3'b000: $write("ebreak");
+	     3'b010: begin
+		case({instr[27],instr[21]})
+		  2'b00: $write("rdcycle x%0d",   instr[11:7]);
+		  2'b10: $write("rdcycleh x%0d",  instr[11:7]);
+		  2'b01: $write("rdinstret x%0d", instr[11:7]);
+		  2'b11: $write("rdinstreth x%0d",instr[11:7]);
+		endcase
+	     end
+	     default: $write("SYSTEM");
+	   endcase
+	end
+	default:
+	  $write("?????");
+      endcase
+   end
+endtask
 
-function signed [31:0] riscv_dis_I_imm;
-  input [31:0] instr;
-  riscv_dis_I_imm = {{21{instr[31]}}, instr[30:20]};
-//{21{instr[31]}}: performs a sign extension on bit 32, 21 times, this converts a 12-bits signed quantity into a 32-bits one.
-//instr[30:20]:  This selects bits 20 through 30 from the instr variable, which represents a portion of the immediate value encoded in an I-type. 
-// {{21{instr[31]}}, instr[30:20]}: This operation concatenates the 21 replicated sign bits with the 11 bits selected from the instr variable. The upper 21 bits are all copies of the sign bit, and the lower 11 bits are the actual immediate value from the instruction.
-endfunction 
 
-function signed [31:0] riscv_dis_S_imm;
-  input [31:0] instr;
-  riscv_dis_S_imm = {{21{instr[31]}}, instr[30:25],instr[11:7]}; 
-// Sign extend
-//For S-type instructions, [11:7] also form part of the immediate value.
-//The bits [30:25] are also a part of the immediate value.
-//Concatenates all three to form S-type
+/* Instruction recognizers for the 10 RV32I instructions */
+function riscv_disasm_isALUreg; input [31:0] I; riscv_disasm_isALUreg=(I[6:0]==7'b0110011); endfunction
+function riscv_disasm_isALUimm; input [31:0] I; riscv_disasm_isALUimm=(I[6:0]==7'b0010011); endfunction
+function riscv_disasm_isBranch; input [31:0] I; riscv_disasm_isBranch=(I[6:0]==7'b1100011); endfunction
+function riscv_disasm_isJALR;   input [31:0] I; riscv_disasm_isJALR  =(I[6:0]==7'b1100111); endfunction
+function riscv_disasm_isJAL;    input [31:0] I; riscv_disasm_isJAL   =(I[6:0]==7'b1101111); endfunction
+function riscv_disasm_isAUIPC;  input [31:0] I; riscv_disasm_isAUIPC =(I[6:0]==7'b0010111); endfunction
+function riscv_disasm_isLUI;    input [31:0] I; riscv_disasm_isLUI   =(I[6:0]==7'b0110111); endfunction
+function riscv_disasm_isLoad;   input [31:0] I; riscv_disasm_isLoad  =(I[6:0]==7'b0000011); endfunction
+function riscv_disasm_isStore;  input [31:0] I; riscv_disasm_isStore =(I[6:0]==7'b0100011); endfunction
+function riscv_disasm_isSYSTEM; input [31:0] I; riscv_disasm_isSYSTEM=(I[6:0]==7'b1110011); endfunction
+function riscv_disasm_isRV32M;  input [31:0] I; riscv_disasm_isRV32M=riscv_disasm_isALUreg(I) && I[25]; endfunction
+
+/* Utility functions: register indices */
+function [4:0] riscv_disasm_rs1Id; input [31:0] I; riscv_disasm_rs1Id = I[19:15];      endfunction
+function [4:0] riscv_disasm_rs2Id; input [31:0] I; riscv_disasm_rs2Id = I[24:20];      endfunction
+function [4:0] riscv_disasm_shamt; input [31:0] I; riscv_disasm_shamt = I[24:20];      endfunction   
+function [4:0] riscv_disasm_rdId;  input [31:0] I; riscv_disasm_rdId  = I[11:7];       endfunction
+function [1:0] riscv_disasm_csrId; input [31:0] I; riscv_disasm_csrId = {I[27],I[21]}; endfunction
+
+/* Utility functions: funct3 and funct7 */
+function [2:0] riscv_disasm_funct3; input [31:0] I; riscv_disasm_funct3 = I[14:12]; endfunction
+function [6:0] riscv_disasm_funct7; input [31:0] I; riscv_disasm_funct7 = I[31:25]; endfunction      
+
+function riscv_disasm_readsRs1;
+   input [31:0] I;
+   riscv_disasm_readsRs1 = !(riscv_disasm_isJAL(I) || riscv_disasm_isAUIPC(I) || riscv_disasm_isLUI(I));
 endfunction
 
-function signed [31:0] riscv_dis_U_imm_only;
-  input [31:0] instr;
-  riscv_dis_U_imm_only = {instr[31:12]};
-//Used for LUI and AUIPC
-//i.e. AUIPC: You need rd, the 20 bit immediate, then PC+U_immediate (shifted left by 12)  would give the address of the AUIPC target
+function riscv_disasm_readsRs2;
+   input [31:0] I;
+   riscv_disasm_readsRs2 = riscv_disasm_isALUreg(I) || riscv_disasm_isBranch(I) || riscv_disasm_isStore(I);
 endfunction
 
-function signed [31:0] riscv_dis_U_imm;
-  input [31:0] instr;
-  riscv_dis_U_imm = {instr[31],instr[30:12],{12{1'b0}}};
-endfunction
-
-function [31:0] riscv_dis_B_imm;
-  input [31:0] instr;
-  riscv_dis_B_imm = {
-	  {20{instr[31]}},instr[7],instr[30:25],instr[11:8],1'b0};
-endfunction
-/*
-{20{instr[31]}}: Takes the 32nd bit of the instruction, which is the sign bit of the B-immediate, and replicates it 20 times to sign extend it.
-
-instr[7]: This bit is part of the immediate value for B-type instructions
-
-instr[30:25]: These bits are also part of the immediate value
-
-instr[11:8]: These four bits are the next part of the immediate value..
-
-1'b0: Finally, a single '0' bit is appended to the least significant bit of the immediate. This is because B-type immediate values are word-aligned, meaning they are always a multiple of 2, so theleast significant bit is always 0.
-
-*/
-
-function [31:0] riscv_dis_J_imm;
-  input [31:0] instr;
-  riscv_dis_J_imm = {
-          {12{instr[31]}},instr[19:12],instr[20],instr[30:21],1'b0};
-endfunction
-//Similar to B-type instruction
-
-//
-task riscv_dis;
-  input instr[31:0];
-  input PC[31:0];
-  begin
-    case(instr[6:0]):
-      7'b0110011: begin
-        if(instr[31:7] == 0) begin
-          $write("nop");
-        end else begin
-
+   
